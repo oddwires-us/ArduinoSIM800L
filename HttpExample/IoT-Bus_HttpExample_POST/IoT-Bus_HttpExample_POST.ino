@@ -1,8 +1,6 @@
 #include <ArduinoJson.h>
 #include <Http.h>
 
-//#define serialSIM800 Serial2
-
 unsigned long lastRunTime = 0;
 unsigned long waitForRunTime = 0;
 
@@ -36,8 +34,8 @@ void print(const __FlashStringHelper *message, int code = -1){
 }
 
 void doPost(){
-  http.powerDownNow();
-  http.preInit();
+
+  http.preInit(); // modified for IoT-Bus sequence
   char response[2048];
   char body[] = "myName=ian";
   Result result;
