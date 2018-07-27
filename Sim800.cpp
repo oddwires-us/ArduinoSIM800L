@@ -33,11 +33,13 @@ int SIM800::preInit(void)
     pinMode(resetPin, OUTPUT);
 
     digitalWrite(resetPin, HIGH);
-    delay(200);
+    delay(1000);
     digitalWrite(resetPin, LOW);
-    delay(2000);
+    delay(1000);
     digitalWrite(resetPin, HIGH);
-    delay(3000);
+    delay(1000);
+    digitalWrite(resetPin, LOW);
+    delay(1000);
 
     purgeSerial();
 
@@ -84,7 +86,8 @@ void SIM800::cleanBuffer(char *buffer, int count)
 
 void SIM800::sendCmd(const char* cmd)
 {
-    serialSIM800.listen();
+    //serialSIM800.listen();
+    if (debugMode) Serial.println(cmd);
     serialSIM800.write(cmd);
 }
 
@@ -115,7 +118,8 @@ int SIM800::waitForResp(const char *resp, unsigned int timeout)
     }
 
     while(serialSIM800.available()) {
-        serialSIM800.read();
+        char c = serialSIM800.read();
+        if (debugMode) Serial.print(c);
     }
 
     return TRUE;

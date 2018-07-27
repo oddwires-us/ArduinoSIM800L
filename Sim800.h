@@ -30,12 +30,15 @@
 #define __SIM800_H__
 
 #include "Arduino.h"
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
 
 #define TRUE                    1
 #define FALSE                   0
 #define DEFAULT_TIMEOUT         5000
 
+#define serialSIM800 Serial2
+
+extern HardwareSerial serialSIM800; // global
 
 /** SIM800 class.
  *  Used for SIM800 communication. attention that SIM800 module communicate with MCU in serial protocol
@@ -49,7 +52,7 @@ public:
      *  @param rxPin uart receive pin to communicate with SIM800
      *  @param txPin uart transmit pin to communicate with SIM800
      */
-    SIM800(unsigned int baudRate, unsigned int rxPin, unsigned int txPin, unsigned int rstPin, bool debug):serialSIM800(txPin, rxPin) {
+    SIM800(unsigned int baudRate, unsigned int rstPin, bool debug) {
         serialSIM800.begin(baudRate);
         debugMode = debug;
         resetPin = rstPin;
@@ -122,8 +125,6 @@ public:
     void purgeSerial();
 
 private:
-
-    SoftwareSerial serialSIM800;
     bool debugMode;
     unsigned int resetPin;
 

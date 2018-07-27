@@ -36,12 +36,13 @@
 #define HTTP_INIT "AT+HTTPINIT\r\n"
 #define HTTP_CID "AT+HTTPPARA=\"CID\",1\r\n"
 #define HTTP_PARA "AT+HTTPPARA=\"URL\",\"%s\"\r\n"
+#define HTTP_USERDATA "AT+HTTPPARA=\"USERDATA\",\"%s\"\r\n"
 #define HTTP_GET "AT+HTTPACTION=0\r\n"
 #define HTTP_POST "AT+HTTPACTION=1\n"
 #define HTTP_DATA "AT+HTTPDATA=%d,%d\r\n"
 #define HTTP_READ "AT+HTTPREAD\r\n"
 #define HTTP_CLOSE "AT+HTTPTERM\r\n"
-#define HTTP_CONTENT "AT+HTTPPARA=\"CONTENT\",\"application/json\"\r\n"
+#define HTTP_CONTENT "AT+HTTPPARA=\"CONTENT\",\"%s\"\r\n"
 #define HTTPS_ENABLE "AT+HTTPSSL=1\r\n"
 #define HTTPS_DISABLE "AT+HTTPSSL=0\r\n"
 #define NORMAL_MODE "AT+CFUN=1,1\r\n"
@@ -49,6 +50,7 @@
 #define SIGNAL_QUALITY "AT+CSQ\r\n"
 #define READ_VOLTAGE "AT+CBC\r\n"
 #define SLEEP_MODE "AT+CSCLK=1\r\n"
+#define GPRSATTACH "AT+CGATT=1"
 
 #define OK "OK\r\n"
 #define DOWNLOAD "DOWNLOAD"
@@ -56,6 +58,20 @@
 #define HTTPS_PREFIX "https://"
 #define CONNECTED "+CREG: 0,1"
 #define BEARER_OPEN "+SAPBR: 1,1"
+#define POWERDOWN "AT+CPOWD=1"
+#define POWERDOWNNOW "AT+CPOWD=0"
+
+#define JSONTYPE "application/json"
+#define FORMTYPE "application/x-www-form-urlencoded"
+
+void HTTP::powerDown(void){
+	sendCmd(POWERDOWN);
+}
+
+void HTTP::powerDownNow(void){
+	sendCmd(POWERDOWNNOW);
+}
+
 
 Result HTTP::configureBearer(const char *apn){
 
@@ -82,9 +98,12 @@ Result HTTP::configureBearer(const char *apn){
 
   char httpApn[64];
   sprintf(httpApn, BEARER_PROFILE_APN, apn);
-  if (sendCmdAndWaitForResp(httpApn, OK, 2000) == FALSE)
+  if (sendCmdAndWaitForResp(httpApn, OK, 2000) == FALSE){
     result = ERROR_BEARER_PROFILE_APN;
-
+  }
+  else{
+  	Serial.println("bearer setup successfully");
+  }
   return result;
 }
 
@@ -93,6 +112,8 @@ Result HTTP::connect() {
   Result result = SUCCESS;
   unsigned int attempts = 0;
   unsigned int MAX_ATTEMPTS = 10;
+  
+  sendCmdAndWaitForResp(GPRSATTACH, OK, 2000); // make sure we are attached to GPRS
 
   while (sendCmdAndWaitForResp(QUERY_BEARER, BEARER_OPEN, 2000) == FALSE && attempts < MAX_ATTEMPTS){
     attempts ++;
@@ -101,12 +122,16 @@ Result HTTP::connect() {
     }
     else {
       result = SUCCESS;
+      sendCmdAndWaitForResp(QUERY_BEARER, BEARER_OPEN, 2000); // should now have ip address
     }
   }
 
-  if (sendCmdAndWaitForResp(HTTP_INIT, OK, 2000) == FALSE)
+  if (sendCmdAndWaitForResp(HTTP_INIT, OK, 2000) == FALSE){
     result = ERROR_HTTP_INIT;
-
+  }
+  else{
+  	Serial.println("Connected successfully");
+  }
   return result;
 }
 
@@ -129,10 +154,10 @@ Result HTTP::post(const char *uri, const char *body, char *response) {
   char httpData[32];
   unsigned int delayToDownload = 10000;
   sprintf(httpData, HTTP_DATA, strlen(body), 10000);
+  Serial.println(httpData);
   if (sendCmdAndWaitForResp(httpData, DOWNLOAD, 2000) == FALSE){
     result = ERROR_HTTP_DATA;
   }
-
   purgeSerial();
   delay(500);
   sendCmd(body);
@@ -152,7 +177,7 @@ Result HTTP::post(const char *uri, const char *body, char *response) {
 Result HTTP::get(const char *uri, char *response) {
 
   Result result = setHTTPSession(uri);
-
+  
   if (sendCmdAndWaitForResp(HTTP_GET, HTTP_2XX, 2000) == TRUE) {
     sendCmd(HTTP_READ);
     result = SUCCESS;
@@ -199,32 +224,66 @@ Result HTTP::setHTTPSession(const char *uri){
   if (sendCmdAndWaitForResp(HTTP_CID, OK, 2000) == FALSE)
     result = ERROR_HTTP_CID;
 
-  char httpPara[128];
+  char httpPara[1024];
   sprintf(httpPara, HTTP_PARA, uri);
 
   if (sendCmdAndWaitForResp(httpPara, OK, 2000) == FALSE)
     result = ERROR_HTTP_PARA;
+    
+  sendHeader(); // send header data if we have any  
 
   bool https = strncmp(HTTPS_PREFIX, uri, strlen(HTTPS_PREFIX)) == 0;
+  Serial.println(https);
   if (sendCmdAndWaitForResp(https ? HTTPS_ENABLE : HTTPS_DISABLE, OK, 2000) == FALSE) {
     result = https ? ERROR_HTTPS_ENABLE : ERROR_HTTPS_DISABLE;
   }
-
-  if (sendCmdAndWaitForResp(HTTP_CONTENT, OK, 2000) == FALSE)
+  // now send the content type
+  if (_contentType != NULL){
+  	sprintf(httpPara, HTTP_CONTENT, _contentType);
+  }
+  if (sendCmdAndWaitForResp(httpPara, OK, 2000) == FALSE){
     result = ERROR_HTTP_CONTENT;
+  }
+  else{
+		Serial.println("content type ok");
+  }
 
   return result;
 }
 
 void HTTP::readResponse(char *response){
 
-  char buffer[128];
+  char buffer[1024];
   cleanBuffer(buffer, sizeof(buffer));
   cleanBuffer(response, sizeof(response));
 
   if (readBuffer(buffer, sizeof(buffer)) == TRUE){
     parseJSONResponse(buffer, sizeof(buffer), response);
   }
+}
+
+Result HTTP::sendHeader(){
+
+  if (_header != NULL){
+	  Result result;
+	  char httpPara[1024]; // we won't do it like this
+	  sprintf(httpPara, HTTP_USERDATA, _header);
+
+	  if (sendCmdAndWaitForResp(httpPara, OK, 2000) == FALSE){
+		result = ERROR_HTTP_PARA;
+	  }
+	  else{
+		Serial.println("added header");
+	  }
+  }
+}
+
+void HTTP::setHeader(const char* header){
+  _header = header;
+}
+
+void HTTP::setContentType(const char* contentType){
+  _contentType = contentType;
 }
 
 void HTTP::parseJSONResponse(const char *buffer, unsigned int bufferSize, char *response){

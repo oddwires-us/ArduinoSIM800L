@@ -55,7 +55,7 @@ enum Result {
 class HTTP : public SIM800 {
 
   public:
-    HTTP(unsigned int baudRate, unsigned int rxPin, unsigned int txPin, unsigned int rstPin, bool debug = TRUE):SIM800(baudRate, rxPin, txPin, rstPin, debug){};
+    HTTP(unsigned int baudRate, unsigned int rstPin, bool debug = TRUE):SIM800(baudRate, rstPin, debug){};
     Result configureBearer(const char *apn);
     Result connect();
     Result disconnect();
@@ -64,9 +64,17 @@ class HTTP : public SIM800 {
     void sleep();
     void wakeUp();
     void readVoltage(char *voltage);
+    Result sendHeader();
+    void setHeader(const char* header);
+    void setContentType(const char* content);
+    void powerDown(void);
+    void powerDownNow(void);
+
 
   private:
     void readResponse(char *response);
     Result setHTTPSession(const char *uri);
     void parseJSONResponse(const char *buffer, unsigned int bufferSize, char *response);
+    const char* _header;
+    const char* _contentType;
 };
