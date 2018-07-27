@@ -48,14 +48,15 @@ enum Result {
   ERROR_NORMAL_MODE = 16,
   ERROR_LOW_CONSUMPTION_MODE = 17,
   ERROR_HTTPS_ENABLE = 18,
-  ERROR_HTTPS_DISABLE = 19
+  ERROR_HTTPS_DISABLE = 19,
+  ERROR_REDIRECT = 19
 };
 
 
 class HTTP : public SIM800 {
 
   public:
-    HTTP(unsigned int baudRate, unsigned int rstPin, bool debug = TRUE):SIM800(baudRate, rstPin, debug){};
+    HTTP(unsigned int baudRate, unsigned int rstPin, bool debug = TRUE):SIM800(baudRate, rstPin, debug){ debugMode = debug; redirect = false;};
     Result configureBearer(const char *apn);
     Result connect();
     Result disconnect();
@@ -69,6 +70,7 @@ class HTTP : public SIM800 {
     void setContentType(const char* content);
     void powerDown(void);
     void powerDownNow(void);
+    void setRedirect(bool);
 
 
   private:
@@ -77,4 +79,6 @@ class HTTP : public SIM800 {
     void parseJSONResponse(const char *buffer, unsigned int bufferSize, char *response);
     const char* _header;
     const char* _contentType;
+    bool debugMode;
+    bool redirect; // set to true for automatic redirection on 30x redirects
 };

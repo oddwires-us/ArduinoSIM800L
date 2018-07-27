@@ -35,6 +35,7 @@
 #define CLOSE_GPRS_CONTEXT "AT+SAPBR=0,1\r\n"
 #define HTTP_INIT "AT+HTTPINIT\r\n"
 #define HTTP_CID "AT+HTTPPARA=\"CID\",1\r\n"
+#define HTTP_REDIRECT "AT+HTTPPARA=\"REDIR\",1\r\n"
 #define HTTP_PARA "AT+HTTPPARA=\"URL\",\"%s\"\r\n"
 #define HTTP_USERDATA "AT+HTTPPARA=\"USERDATA\",\"%s\"\r\n"
 #define HTTP_GET "AT+HTTPACTION=0\r\n"
@@ -72,6 +73,7 @@ void HTTP::powerDownNow(void){
 	sendCmd(POWERDOWNNOW);
 }
 
+char buffer[1024]; // global buffer
 
 Result HTTP::configureBearer(const char *apn){
 
@@ -175,10 +177,10 @@ Result HTTP::post(const char *uri, const char *body, char *response) {
 }
 
 Result HTTP::get(const char *uri, char *response) {
-
-  Result result = setHTTPSession(uri);
   
-  if (sendCmdAndWaitForResp(HTTP_GET, HTTP_2XX, 2000) == TRUE) {
+  if (debugMode) Serial.println("get");
+  Result result = setHTTPSession(uri);
+  if (sendCmdAndWaitForResp(HTTP_GET, HTTP_2XX, 10000) == TRUE) { // we need to know failure code
     sendCmd(HTTP_READ);
     result = SUCCESS;
     readResponse(response);
@@ -199,7 +201,7 @@ void HTTP::wakeUp(){
 }
 
 void HTTP::readVoltage(char *voltage){
-  char buffer[64];
+  
   cleanBuffer(buffer, sizeof(buffer));
   cleanBuffer(voltage, sizeof(voltage));
 
@@ -219,10 +221,15 @@ void HTTP::readVoltage(char *voltage){
 }
 
 Result HTTP::setHTTPSession(const char *uri){
-
+  if (debugMode) Serial.println("setHTTPSession");
   Result result;
   if (sendCmdAndWaitForResp(HTTP_CID, OK, 2000) == FALSE)
     result = ERROR_HTTP_CID;
+  
+  if(redirect){  
+  	if (sendCmdAndWaitForResp(HTTP_REDIRECT, OK, 2000) == FALSE)
+    	result = ERROR_REDIRECT; 
+  } 
 
   char httpPara[1024];
   sprintf(httpPara, HTTP_PARA, uri);
@@ -239,21 +246,25 @@ Result HTTP::setHTTPSession(const char *uri){
   }
   // now send the content type
   if (_contentType != NULL){
+  	Serial.println("Content type specified");
   	sprintf(httpPara, HTTP_CONTENT, _contentType);
-  }
-  if (sendCmdAndWaitForResp(httpPara, OK, 2000) == FALSE){
-    result = ERROR_HTTP_CONTENT;
+  	if (sendCmdAndWaitForResp(httpPara, OK, 2000) == FALSE){
+    	result = ERROR_HTTP_CONTENT;
+  	}
+  	else{
+		Serial.println("Content type ok");
+	}
   }
   else{
-		Serial.println("content type ok");
+  	Serial.println("Content type null");
   }
 
   return result;
 }
 
 void HTTP::readResponse(char *response){
+  if (debugMode) Serial.println("readResponse");
 
-  char buffer[1024];
   cleanBuffer(buffer, sizeof(buffer));
   cleanBuffer(response, sizeof(response));
 
@@ -284,6 +295,10 @@ void HTTP::setHeader(const char* header){
 
 void HTTP::setContentType(const char* contentType){
   _contentType = contentType;
+}
+
+void HTTP::setRedirect(bool redir){
+  redirect = redir;
 }
 
 void HTTP::parseJSONResponse(const char *buffer, unsigned int bufferSize, char *response){
