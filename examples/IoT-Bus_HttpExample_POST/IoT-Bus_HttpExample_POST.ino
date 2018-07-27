@@ -1,3 +1,7 @@
+/****************************************************/
+/* This example shows how to perform a scriptr POST */
+/****************************************************/
+
 #include <ArduinoJson.h>
 #include <Http.h>
 
