@@ -9,6 +9,7 @@ A smart HTTP library based on SIM800 that implements AT HTTP commands to perform
 * This version enables additional headers to be added (e.g. for authentication/authorization
 * It also enables alternative content-types to be submitted
 * pre-init has been modified to support IoT-Bus GSM modules - you may need to modify that for your power on sequence
+* automatic redirect can now be enabled - see the Nest GET example
 
 ## Installation
 Download the library and then import it.
